@@ -22,7 +22,7 @@ while True:
     frame_count += 1
 
     # Run YOLO inference on this frame
-    results = model(frame, verbose=False)
+    results = model(frame, verbose=False, conf=0.5)
 
     # results[0].plot() draws all the boxes/labels/confidence scores automatically
     annotated_frame = results[0].plot()
