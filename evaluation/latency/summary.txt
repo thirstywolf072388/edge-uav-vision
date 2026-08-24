@@ -1,0 +1,12 @@
+YOLOv8n on CPU (WSL2)
+
+Cold start (first frame): 2390.30 ms
+
+Steady-state (frames 2+):
+Frames analyzed: 794
+Mean latency: 9.09 ms
+Median latency: 8.60 ms
+p95 latency: 12.71 ms
+p99 latency: 16.42 ms
+Min / Max latency: 7.28 / 18.54 ms
+Mean FPS: 112.63
