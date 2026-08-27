@@ -5,7 +5,7 @@ import csv
 
 model = YOLO("yolov8n.pt")
 
-video_path = "data/vtest.avi"
+video_path = "data/youtube_test.mkv"
 cap = cv2.VideoCapture(video_path)
 
 if not cap.isOpened():
@@ -31,8 +31,18 @@ while True:
     results = model(frame, verbose=False, conf=0.5)
     t2 = time.perf_counter()
 
-    # --- Postprocessing stage ---
+    # Live console output every frame
+    classes_found = [model.names[int(box.cls)] for box in results[0].boxes]
+    print(f"Frame {frame_count} | {len(classes_found)} detection(s): {classes_found}")
+
+    # Live video window with boxes drawn
     annotated_frame = results[0].plot()
+    cv2.imshow("Live Detection", annotated_frame)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        print("Quit requested via 'q' key")
+        break
+
+    # --- Postprocessing stage ---
     num_detections = len(results[0].boxes)
     t3 = time.perf_counter()
 
@@ -56,7 +66,7 @@ while True:
         out_path = f"data/yolo_frame_{frame_count}.jpg"
         cv2.imwrite(out_path, annotated_frame)
         print(f"Frame {frame_count} | {total_ms:.1f}ms total | {fps:.1f} FPS | {num_detections} detections")
-
+cv2.destroyAllWindows()
 cap.release()
 
 # Save full timing log to CSV
