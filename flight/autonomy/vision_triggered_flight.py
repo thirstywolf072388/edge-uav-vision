@@ -6,6 +6,8 @@ from mavsdk import System
 
 TARGET_CLASSES = ["person", "bird", "dog", "cat", "cow", "bear"]
 COOLDOWN_SECONDS = 60
+CONFIDENCE_THRESHOLD = 0.65
+CONFIRMATION_FRAMES = 5  # must detect target for this many consecutive frames
 METERS_PER_DEGREE_LAT = 111111
 
 model = YOLO("yolov8n.pt")
@@ -64,8 +66,11 @@ async def watch_and_trigger(drone):
             print("Position lock achieved. Watching for targets...")
             break
 
+
     last_trigger_time = 0
     frame_count = 0
+    consecutive_detections = 0
+    last_seen_class = None
 
     while True:
         ret, frame = cap.read()
@@ -73,24 +78,49 @@ async def watch_and_trigger(drone):
             break
         frame_count += 1
 
-        results = model(frame, verbose=False, conf=0.5)
+        results = model(frame, verbose=False, conf=CONFIDENCE_THRESHOLD)
+
+        # Check if ANY box this frame is a qualifying target
+        frame_has_target = False
+        detected_class = None
+        detected_conf = 0
 
         for box in results[0].boxes:
             class_name = model.names[int(box.cls)]
             confidence = float(box.conf)
 
-            if class_name in TARGET_CLASSES:
-                now = time.time()
-                if now - last_trigger_time >= COOLDOWN_SECONDS:
-                    print(f"\n🚨 Frame {frame_count}: '{class_name}' detected "
-                          f"({confidence:.2f}). Launching mission...\n")
-                    last_trigger_time = now
-                    await fly_mission(drone)
-                    print("\nResuming watch...\n")
-                    break  # only one trigger per frame
+            if class_name in TARGET_CLASSES and confidence >= CONFIDENCE_THRESHOLD:
+                frame_has_target = True
+                detected_class = class_name
+                detected_conf = confidence
+                break  # one qualifying detection is enough for this frame
+
+        if frame_has_target:
+            consecutive_detections += 1
+            last_seen_class = detected_class
+            print(f"Frame {frame_count}: '{detected_class}' ({detected_conf:.2f}) "
+                  f"— confirmation {consecutive_detections}/{CONFIRMATION_FRAMES}")
+        else:
+            if consecutive_detections > 0:
+                print(f"Frame {frame_count}: detection lost, resetting confirmation counter")
+            consecutive_detections = 0
+            last_seen_class = None
+
+        if consecutive_detections >= CONFIRMATION_FRAMES:
+            now = time.time()
+            if now - last_trigger_time >= COOLDOWN_SECONDS:
+                print(f"\n🚨 CONFIRMED over {CONFIRMATION_FRAMES} consecutive frames: "
+                      f"'{last_seen_class}'. Launching mission...\n")
+                last_trigger_time = now
+                consecutive_detections = 0  # reset after triggering
+                await fly_mission(drone)
+                print("\nResuming watch...\n")
+            else:
+                consecutive_detections = 0  # still reset even if in cooldown
 
     cap.release()
     print(f"Video ended. Processed {frame_count} frames.")
+
 
 
 async def run():
