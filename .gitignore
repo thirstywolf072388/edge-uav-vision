@@ -1,3 +1,7 @@
 venv/
 data/*.jpg
 data/*.avi
+data/*.mkv
+data/*.mp4
+data/*.webm
+data/*.avi
